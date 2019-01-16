@@ -1,0 +1,5 @@
+chronograf/data/
+influxdb/data/
+kapacitor/data/
+grafana/data/
+node_modules/

@@ -1,0 +1,138 @@
+#!/bin/bash
+set -eo pipefail
+IFS=$'\n\t'
+
+sandbox () {
+  enter () {
+    case $2 in
+      influxdb)
+        echo "Entering /bin/bash session in the influxdb container..."
+        docker-compose exec influxdb /bin/bash
+        ;;
+      chronograf)
+        echo "Entering /bin/sh session in the chronograf container..."
+        docker-compose exec chronograf /bin/sh
+        ;;
+      grafana)
+        echo "Entering /bin/sh session in the grafana container..."
+        docker-compose exec grafana /bin/sh
+        ;;
+      kapacitor)
+        echo "Entering /bin/bash session in the kapacitor container..."
+        docker-compose exec kapacitor /bin/bash
+        ;;
+      telegraf)
+        echo "Entering /bin/bash session in the telegraf container..."
+        docker-compose exec telegraf /bin/bash
+        ;;
+      flux)
+        echo "Entering /bin/bash session in the flux container..."
+        docker-compose exec flux /bin/sh
+        ;;
+      *)
+        echo "sandbox enter (influxdb||chronograf||kapacitor||telegraf||flux)"
+        ;;
+    esac
+  }
+
+  # Logs streams the logs from the container to the shell
+  logs () {
+    case $2 in
+      influxdb)
+        echo "Following the logs from the influxdb container..."
+        docker-compose logs -f influxdb
+        ;;
+      chronograf)
+        echo "Following the logs from the chronograf container..."
+        docker-compose logs -f chronograf
+        ;;
+      grafana)
+        echo "Following the logs from the grafana container..."
+        docker-compose logs -f grafana
+        ;;
+      kapacitor)
+        echo "Following the logs from the kapacitor container..."
+        docker-compose logs -f kapacitor
+        ;;
+      telegraf)
+        echo "Following the logs from the telegraf container..."
+        docker-compose logs -f telegraf
+        ;;
+      *)
+        echo "sandbox logs (influxdb||chronograf||kapacitor||telegraf)"
+        ;;
+    esac
+  }
+
+  case $1 in
+    up)
+      echo "Spinning up Docker Images..."
+      echo "If this is your first time starting sandbox this might take a minute..."
+      docker-compose up -d --build
+      echo "Opening tabs in browser..."
+      sleep 3
+      if [ $(uname) == "Darwin" ]; then
+        open http://localhost:8888
+        open http://localhost:3000
+        open http://localhost:3020
+      elif [ $(uname) == "Linux" ]; then
+        sensible-browser http://localhost:8888
+        sensible-browser http://localhost:3000
+        sensible-browser http://localhost:3020
+      else
+        echo "no browser detected..."
+      fi
+      sleep 10
+      curl 'http://admin:admin@localhost:3000/api/datasources' -X POST -H 'Content-Type: application/json;charset=UTF-8' --data-binary '{"name":"InfluxDB","type":"influxdb","url":"http://influxdb:8086","access":"proxy","isDefault":true,"database":"telegraf"}'
+      ;;
+    down)
+      echo "Stopping sandbox containers..."
+      docker-compose down
+      ;;
+    restart)
+      echo "Stopping all sandbox processes..."
+      docker-compose down > /dev/null 2>&1
+      echo "Starting all sandbox processes..."
+      docker-compose up -d --build > /dev/null 2>&1
+      echo "Services available!"
+      ;;
+    delete-data)
+      echo "deleting all influxdb, kapacitor, chronograf and grafana data..."
+      rm -rf kapacitor/data influxdb/data chronograf/data grafana/data
+      ;;
+    docker-clean)
+      echo "Stopping and removing running sandbox containers..."
+      docker-compose down
+      echo "Removing TICK images..."
+      docker rmi influxdb:latest telegraf:latest kapacitor:latest chronograf:latest grafana/grafana chrono_config:latest quay.io/influxdb/influxdb:nightly quay.io/influxdb/chronograf:nightly> /dev/null 2>&1
+      docker rmi $(docker images -f "dangling=true" -q)
+      ;;
+    influxdb)
+      echo "Entering the influx cli..."
+      docker-compose exec influxdb /usr/bin/influx
+      ;;
+    enter)
+      enter $@
+      ;;
+    logs)
+      logs $@
+      ;;
+    *)
+      cat <<-EOF
+sandbox commands:
+  up      -> spin up the sandbox environment
+  down               -> tear down the sandbox environment
+  restart -> restart the sandbox
+  influxdb           -> attach to the influx cli
+
+  enter (influxdb||kapacitor||chronograf||telegraf||grafana) -> enter the specified container
+  logs  (influxdb||kapacitor||chronograf||telegraf||grafana) -> stream logs for the specified container
+
+  delete-data  -> delete all data created by the TICK Stack
+  docker-clean -> stop and remove all running docker containers and images
+EOF
+      ;;
+  esac
+}
+
+sandbox $@

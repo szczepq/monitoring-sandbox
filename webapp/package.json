@@ -1,0 +1,15 @@
+{
+  "main": "index.js",
+  "scripts": {
+    "start": "node index",
+    "start.dev": "nodemon"
+  },
+  "dependencies": {
+    "express": "^4.16.2",
+    "influx": "^5.0.7",
+    "os": "^0.1.1"
+  },
+  "devDependencies": {
+    "nodemon": "^1.14.12"
+  }
+}
